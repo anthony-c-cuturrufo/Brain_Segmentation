@@ -5,7 +5,7 @@ import os
 import numpy as np
 import torch
 import torch.nn.functional as F
-from PIL import Image
+from PIL import Image, ImageSequence
 from torchvision import transforms
 
 from utils.data_loading import BasicDataset
@@ -16,7 +16,8 @@ def predict_img(net,
                 full_img,
                 device,
                 scale_factor=1,
-                out_threshold=0.5):
+                out_threshold=0.5,
+                output_prob=False):
     net.eval()
     img = torch.from_numpy(BasicDataset.preprocess(full_img, scale_factor, is_mask=False))
     img = img.unsqueeze(0)
@@ -41,10 +42,18 @@ def predict_img(net,
     if net.n_classes == 1:
         return (full_mask > out_threshold).numpy()
     else:
-        return F.one_hot(full_mask.argmax(dim=0), net.n_classes).permute(2, 0, 1).numpy()
+#         print("FULL_MASK:", full_mask, full_mask.shape)
+#         temp = full_mask.argmax(dim=0)
+#         print("RES:", temp, temp.shape)
+        if not output_prob: 
+            return F.one_hot(full_mask.argmax(dim=0), net.n_classes).permute(2, 0, 1).numpy()
+        else:
+            return full_mask[1].numpy()
+            
 
 
 def get_args():
+    #TODO output probabilities
     parser = argparse.ArgumentParser(description='Predict masks from input images')
     parser.add_argument('--model', '-m', default='MODEL.pth', metavar='FILE',
                         help='Specify the file in which the model is stored')
@@ -57,6 +66,10 @@ def get_args():
                         help='Minimum probability value to consider a mask pixel white')
     parser.add_argument('--scale', '-s', type=float, default=0.5,
                         help='Scale factor for the input images')
+    parser.add_argument('--movie', '-mv', action='store_true',
+                        help='Predict file with multiple images')
+    parser.add_argument('--prob', '-p', action='store_true',
+                        help='Output probability instead of label')
 
     return parser.parse_args()
 
@@ -73,6 +86,7 @@ def mask_to_image(mask: np.ndarray):
     if mask.ndim == 2:
         return Image.fromarray((mask * 255).astype(np.uint8))
     elif mask.ndim == 3:
+        print("HIT NDIM EQUALS 3 FLAG")
         return Image.fromarray((np.argmax(mask, axis=0) * 255 / mask.shape[0]).astype(np.uint8))
 
 
@@ -95,19 +109,27 @@ if __name__ == '__main__':
     for i, filename in enumerate(in_files):
         logging.info(f'\nPredicting image {filename} ...')
         img = Image.open(filename)
+        masks = []
+        for j, page in enumerate(ImageSequence.Iterator(img)):
+        
+            mask = predict_img(net=net,
+                               full_img=img,
+                               scale_factor=args.scale,
+                               out_threshold=args.mask_threshold,
+                               device=device,
+                               output_prob=args.prob)
+            masks.append(Image.fromarray((mask * 255).astype(np.uint8)))
+        
+        out_filename = out_files[i]
 
-        mask = predict_img(net=net,
-                           full_img=img,
-                           scale_factor=args.scale,
-                           out_threshold=args.mask_threshold,
-                           device=device)
+        if len(masks) > 1:
+            masks[0].save(out_filename, save_all=True,append_images=masks[1:]) #save multifile TIF 
+        else:
+            mask = masks[0]
+            if not args.no_save:
+                mask.save(out_filename)
+                logging.info(f'Mask saved to {out_filename}')
 
-        if not args.no_save:
-            out_filename = out_files[i]
-            result = mask_to_image(mask)
-            result.save(out_filename)
-            logging.info(f'Mask saved to {out_filename}')
-
-        if args.viz:
-            logging.info(f'Visualizing results for image {filename}, close to continue...')
-            plot_img_and_mask(img, mask)
+            if args.viz:
+                logging.info(f'Visualizing results for image {filename}, close to continue...')
+                plot_img_and_mask(img, mask)
