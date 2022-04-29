@@ -2,7 +2,7 @@
 Applying Deep Image Segmentation methods to neurological pathways
 
 ## Setup
-  Open shell and run `https://github.com/anthony-c-cuturrufo/Brain_Segmentation.git` in desired directory 
+  Open shell and run ` git clone https://github.com/anthony-c-cuturrufo/Brain_Segmentation.git` in desired directory to clone this repository.  
   
   Run `pip install -r requirements.txt` 
 
