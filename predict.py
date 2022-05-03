@@ -46,6 +46,7 @@ def predict_img(net,
 #         temp = full_mask.argmax(dim=0)
 #         print("RES:", temp, temp.shape)
         if not output_prob: 
+            #print("LOOOOOOOG")
             return F.one_hot(full_mask.argmax(dim=0), net.n_classes).permute(2, 0, 1).numpy()
         else:
             return full_mask[1].numpy()
@@ -86,12 +87,14 @@ def mask_to_image(mask: np.ndarray):
     if mask.ndim == 2:
         return Image.fromarray((mask * 255).astype(np.uint8))
     elif mask.ndim == 3:
-        print("HIT NDIM EQUALS 3 FLAG")
+        #print("HIT NDIM EQUALS 3 FLAG")
         return Image.fromarray((np.argmax(mask, axis=0) * 255 / mask.shape[0]).astype(np.uint8))
 
 
 if __name__ == '__main__':
     args = get_args()
+    print(args)
+
     in_files = args.input
     out_files = get_output_filenames(args)
 
@@ -118,7 +121,12 @@ if __name__ == '__main__':
                                out_threshold=args.mask_threshold,
                                device=device,
                                output_prob=args.prob)
-            masks.append(Image.fromarray((mask * 255).astype(np.uint8)))
+#             print(mask.shape)
+#             print(mask)
+#             print(mask.ndim)
+            #masks.append(Image.fromarray((mask * 255).astype(np.uint8)))
+            pil_image = mask_to_image(mask)
+            masks.append(pil_image)
         
         out_filename = out_files[i]
 
